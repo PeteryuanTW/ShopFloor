@@ -48,7 +48,7 @@ namespace ShopFloor.EFModels
 
             modelBuilder.Entity<ProcessStep>(entity =>
             {
-                entity.HasNoKey();
+                entity.HasKey(e => new { e.ProcessName, e.Action, e.Step });
 
                 entity.Property(e => e.ProcessName).HasMaxLength(50);
 
