@@ -1,0 +1,289 @@
+﻿@page "/TagPage"
+@using System.ComponentModel.DataAnnotations;
+@inject IToastService toastService
+@inject TagService tagService
+<DxGridLayout>
+	<Rows>
+		<DxGridLayoutRow Height="5%" />
+		<DxGridLayoutRow Height="95%" />
+	</Rows>
+	<Columns>
+		<DxGridLayoutColumn Width="100%" />
+	</Columns>
+	<Items>
+		<DxGridLayoutItem Row="0" Column="0">
+			<Template>
+				<div>
+					@* class="rounded-pill" *@
+					<DxToolbar ItemRenderStyleMode="ToolbarRenderStyleMode.Plain">
+						<Items>
+							<DxToolbarItem Text="Add New Tag" RenderStyle="ButtonRenderStyle.Success" Click="ShowAddTagPopup" BeginGroup="true" />
+							@if (selectedTag != null)
+							{
+								<DxToolbarItem Text="Update Tag" RenderStyle="ButtonRenderStyle.Info" Click="ShowUpdateTagPopup" BeginGroup="true" />
+								<DxToolbarItem Text="Delete Tag" RenderStyle="ButtonRenderStyle.Danger" Click="ShowDeleteTagPopup" BeginGroup="true" />
+							}
+						</Items>
+					</DxToolbar>
+				</div>
+			</Template>
+		</DxGridLayoutItem>
+		<DxGridLayoutItem Row="1" Column="0">
+			<Template>
+				<DxGrid Data="tagClasses" AllowSelectRowByClick="true" SelectionMode="GridSelectionMode.Single" SelectedDataItem="selectedTag" SelectedDataItemChanged="SelectedItemChanged">
+					<Columns>
+						<DxGridDataColumn FieldName="TagName" Caption="Name" Width="auto" />
+						<DxGridDataColumn FieldName="tagType" />
+						<DxGridDataColumn FieldName="value" />
+						<DxGridDataColumn FieldName="lastestUpdate" Caption="Update Time" DisplayFormat="yyyy/MM/dd tt hh:mm:ss" />
+					</Columns>
+				</DxGrid>
+			</Template>
+		</DxGridLayoutItem>
+	</Items>
+</DxGridLayout>
+<DxPopup @bind-Visible="@addDialogueVisible" CloseOnOutsideClick="false" ApplyBackgroundShading="true" ShowFooter="true" HeaderText="New Tag">
+	<BodyContentTemplate Context="PopupBodyContext">
+		<DxFormLayout>
+			<DxFormLayoutItem Caption="Name" BeginRow="true" ColSpanLg="12">
+				<DxTextBox @bind-Text="@newTagName" NullText="New Tag Name" BindValueMode="BindValueMode.OnInput" ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"></DxTextBox>
+			</DxFormLayoutItem>
+			<DxFormLayoutItem Caption="Type" BeginRow="true" ColSpanLg="12">
+				<DxComboBox Data="@tagTypeList" @bind-Value="newTagType" EditFormat="{0}. {1}" DisplayFormat="{0}. {1}">
+					<Columns>
+						<DxListEditorColumn FieldName="code"></DxListEditorColumn>
+						<DxListEditorColumn FieldName="type" ></DxListEditorColumn>
+					</Columns>
+				</DxComboBox>
+			</DxFormLayoutItem>
+		</DxFormLayout>
+	</BodyContentTemplate>
+	<FooterContentTemplate>
+		<DxButton RenderStyle="ButtonRenderStyle.Success" Click="(async ()=>{await AddTag();})" Text="Add" Enabled="@(newTagName != null)" />
+	</FooterContentTemplate>
+</DxPopup>
+<DxPopup @bind-Visible="@updateDialogueVisible" CloseOnOutsideClick="false" ApplyBackgroundShading="true" ShowFooter="true" HeaderText="Update Tag">
+	<BodyContentTemplate Context="PopupBodyContext">
+		<DxFormLayout>
+			<DxFormLayoutItem Caption="Name" BeginRow="true" ColSpanLg="12">
+				<DxTextBox @bind-Text="@selectedTag.TagName" ReadOnly="true"></DxTextBox>
+			</DxFormLayoutItem>
+			<DxFormLayoutItem Caption="Type" BeginRow="true" ColSpanLg="12">
+				<DxComboBox Data="@tagTypeList" @bind-Value="@newTagType" EditFormat="{0}. {1}" DisplayFormat="{0}. {1}">
+					<Columns>
+						<DxListEditorColumn FieldName="code"></DxListEditorColumn>
+						<DxListEditorColumn FieldName="type"></DxListEditorColumn>
+					</Columns>
+				</DxComboBox>
+			</DxFormLayoutItem>
+		</DxFormLayout>
+	</BodyContentTemplate>
+	<FooterContentTemplate>
+		<DxButton RenderStyle="ButtonRenderStyle.Info" Click="(async ()=>{await UpdateTag();})" Text="Update" Enabled="@(selectedTag.tagType != newTagType.type)" />
+	</FooterContentTemplate>
+</DxPopup>
+<DxPopup @bind-Visible="@deleteDialogueVisible" CloseOnOutsideClick="false" ApplyBackgroundShading="true" ShowFooter="true" HeaderText="Delete Tag">
+	<BodyContentTemplate Context="PopupBodyContext">
+		<DxFormLayout>
+			<DxFormLayoutItem Caption="Name" BeginRow="true" ColSpanLg="12">
+				<DxTextBox @bind-Text="@selectedTag.TagName" ReadOnly="true"></DxTextBox>
+			</DxFormLayoutItem>
+		</DxFormLayout>
+	</BodyContentTemplate>
+	<FooterContentTemplate>
+		<DxButton RenderStyle="ButtonRenderStyle.Danger" Click="(async ()=>{await DeleteTag();})" Text="Delete"/>
+	</FooterContentTemplate>
+</DxPopup>
+
+@code {
+	private List<TagClass> tagClasses;
+
+	private TagClass selectedTag;
+
+	private bool addDialogueVisible = false;
+	private string newTagName;
+	private List<TagType> tagTypeList;
+	private TagType newTagType;
+
+	private bool updateDialogueVisible = false;
+
+	private bool deleteDialogueVisible = false;
+
+	protected override async Task OnInitializedAsync()
+	{
+		tagClasses = await tagService.GetTagClasses();
+		tagService.AllTagslAct += GetAllTags;
+		tagService.SingleTagUpsertlAct += GetUpsertTag;
+		tagService.SingleTagDeletelAct += GetDeleteTags;
+		InitVar();
+	}
+
+	private void GetAllTags(List<TagClass> tagClasses)
+	{
+		InvokeAsync(() =>
+		{
+			this.tagClasses = tagClasses.ToList();
+			StateHasChanged();
+		});
+	}
+
+	private void GetUpsertTag(TagClass tag)
+	{
+		InvokeAsync(() =>
+		{
+			if (tagClasses.Any(x => x.TagName == tag.TagName))
+			{
+				TagClass tmp = tagClasses.FirstOrDefault(x => x.TagName == tag.TagName);
+				tmp.tagType = tag.tagType;
+				tmp.value = tag.value;
+				tmp.lastestUpdate = tag.lastestUpdate;
+			}
+			else
+			{
+				this.tagClasses.Add(tag);
+				selectedTag = tag;
+			}
+			StateHasChanged();
+		});
+	}
+
+	private void GetDeleteTags(TagClass tag)
+	{
+		InvokeAsync(() =>
+		{
+			if (tagClasses.Any(x => x.TagName == tag.TagName))
+			{
+				tagClasses.RemoveAll(x => x.TagName == tag.TagName);
+				selectedTag = null;
+			}
+			StateHasChanged();
+		});
+	}
+
+	private void InitVar()
+	{
+		InitTagTypeList();
+	}
+	private void InitTagTypeList()
+	{
+		if (tagTypeList == null)
+		{
+			tagTypeList = new List<TagType>
+			{
+				new TagType{code = 0, type = typeof(bool) },
+				new TagType{code = 1, type = typeof(int) },
+				new TagType{code = 2, type = typeof(float) },
+				new TagType{code = 3, type = typeof(string) },
+			};
+		}
+		newTagType = tagTypeList.FirstOrDefault();
+	}
+
+	void SelectedItemChanged(object obj)
+	{
+		if (obj != null)
+		{
+			selectedTag = (TagClass)obj;
+		}
+	}
+
+	//add
+	private void InitAddVar()
+	{
+		newTagName = null;
+	}
+	private void ShowAddTagPopup()
+	{
+		InitAddVar();
+		addDialogueVisible = true;
+	}
+	private async Task AddTag()
+	{
+		if (tagClasses.Any(x => x.TagName == newTagName))
+		{
+			toastService.ShowError("tag " + newTagName + " is already exist");
+		}
+		else
+		{
+			Tag newTag = new Tag
+				{
+					TagName = newTagName,
+					TagType = newTagType.code,
+				};
+			try
+			{
+				await tagService.UpsertTag(newTag);
+				toastService.ShowSuccess("add new tag " + newTag.TagName + " success");
+			}
+			catch (Exception e)
+			{
+				toastService.ShowError("add new tag fail(" + e.Message + ")");
+			}
+		}
+		addDialogueVisible = false;
+	}
+
+	//update
+	private void ShowUpdateTagPopup()
+	{
+		newTagType = tagTypeList.FirstOrDefault(x => x.type == selectedTag.tagType);
+		updateDialogueVisible = true;
+	}
+
+	private async Task UpdateTag()
+	{
+		Tag newTag = new Tag
+			{
+				TagName = selectedTag.TagName,
+				TagType = newTagType.code,
+			};
+		try
+		{
+			await tagService.UpsertTag(newTag);
+			toastService.ShowSuccess("update tag " + newTag.TagName + " success");
+		}
+		catch (Exception e)
+		{
+			toastService.ShowError("update tag fail(" + e.Message + ")");
+		}
+		finally
+		{
+			updateDialogueVisible = false;
+		}
+	}
+
+	//delete
+	private void ShowDeleteTagPopup()
+	{
+		deleteDialogueVisible = true;
+	}
+	private async Task DeleteTag()
+	{
+		int typeCode = tagTypeList.FirstOrDefault(x => x.type == selectedTag.tagType).code;
+		Tag newTag = new Tag
+			{
+				TagName = selectedTag.TagName,
+				TagType = typeCode,
+			};
+		try
+		{
+			bool res = await tagService.DeleteTag(newTag);
+			if (res)
+			{
+				toastService.ShowSuccess("Delete tag " + newTag.TagName + " success");
+			}
+			else
+			{
+				toastService.ShowError("Delete tag fail");
+			}
+		}
+		catch (Exception e)
+		{
+			toastService.ShowError("Delete tag fail(" + e.Message + ")");
+		}
+		finally
+		{
+			deleteDialogueVisible = false;
+		}
+	}
+}

@@ -1,0 +1,157 @@
+﻿@page "/ProcessSettingPage"
+@inject TagService tagService
+@inject ConfigService configService
+
+<DxGridLayout>
+	<Rows>
+		<DxGridLayoutRow Height="20%" />
+		<DxGridLayoutRow Height="80%" />
+	</Rows>
+	<Columns>
+		<DxGridLayoutColumn Width="20%" />
+		<DxGridLayoutColumn Width="80%" />
+	</Columns>
+	<Items>
+		<DxGridLayoutItem Row="0" Column="0">
+			<Template>
+				<DxComboBox Data="processes" Value="targetProcess" SelectedItemChanged="(async (string s)=>{await OnSelectedProcessCahnged(s);})" />
+			</Template>
+		</DxGridLayoutItem>
+		<DxGridLayoutItem Row="1" Column="0">
+			<Template>
+				<DxFormLayout>
+					<DxFormLayoutGroup Caption="Action">
+						<DxFormLayoutItem Caption="Action Type" ColSpanLg="12">
+							<DxComboBox Data="actConfigs" @bind-Value="currentAct" EditFormat="{0}" DisplayFormat="{0}">
+								<Columns>
+									<DxListEditorColumn FieldName="Action"></DxListEditorColumn>
+								</Columns>
+							</DxComboBox>
+						</DxFormLayoutItem>
+						<DxFormLayoutItem Caption="Tag Name" ColSpanLg="12">
+							<DxComboBox Data="tags" @bind-Value="tag" EditFormat="{0}" DisplayFormat="{0}">
+								<Columns>
+									<DxListEditorColumn FieldName="TagName"></DxListEditorColumn>
+								</Columns>
+							</DxComboBox>
+						</DxFormLayoutItem>
+						@if (tag != null)
+						{
+							<DxFormLayoutItem Caption="Value" ColSpanLg="12">
+								@switch (tag.TagType)
+								{
+									case 0:
+										<DxCheckBox @bind-Checked="targetVal_bool" CheckType="CheckType.Switch"></DxCheckBox>
+										break;
+									case 1:
+										<DxSpinEdit @bind-Value="targetVal_int"></DxSpinEdit>
+										break;
+									case 2:
+										<DxSpinEdit @bind-Value="targetVal_float"></DxSpinEdit>
+										break;
+									case 3:
+										<DxTextBox @bind-Text="targetVal_string"></DxTextBox>
+										break;
+									default:
+										break;
+								}
+							</DxFormLayoutItem>
+						}
+					</DxFormLayoutGroup>
+				</DxFormLayout>
+			</Template>
+		</DxGridLayoutItem>
+		<DxGridLayoutItem Row="0" Column="1" RowSpan="2">
+			<Template>
+				<DxGrid Data="processSteps" AllowSelectRowByClick="true" SelectionMode="GridSelectionMode.Single" SelectedDataItem="targetProcessStep" SelectedDataItemChanged="SelectedItemChanged">
+					<Columns>
+						<DxGridDataColumn FieldName="Step" />
+						<DxGridDataColumn FieldName="Action" />
+						<DxGridDataColumn FieldName="Target" />
+						<DxGridDataColumn FieldName="Value" Caption="Target Value"/>
+					</Columns>
+				</DxGrid>
+			</Template>
+		</DxGridLayoutItem>
+	</Items>
+</DxGridLayout>
+
+@code {
+	private IEnumerable<string> processes;
+	private string targetProcess;
+
+	private IEnumerable<ProcessStep> processSteps;
+	private ProcessStep targetProcessStep;
+
+	private IEnumerable<ActionConfig> actConfigs;
+	private ActionConfig currentAct;
+
+	private IEnumerable<Tag> tags;
+	private Tag tag;
+
+	private bool targetVal_bool = false;
+	private int targetVal_int = 0;
+	private float targetVal_float = 0.0f;
+	private string targetVal_string = "";
+	private dynamic targetVal = null;
+
+	protected override async Task OnInitializedAsync()
+	{
+		processes = await configService.GetProcessName();
+		if (processes != null && processes.Any())
+		{
+			targetProcess = processes.FirstOrDefault();
+			await OnSelectedProcessCahnged(targetProcess);
+		}
+		actConfigs = await configService.GetActionConfigs();
+		tags = await tagService.GetTags();
+	}
+
+	private async Task OnSelectedProcessCahnged(string s)
+	{
+		targetProcess = s;
+		processSteps = await configService.GetProcessStepsByName(targetProcess);
+	}
+
+	private void SelectedItemChanged(object obj)
+	{
+		if (obj != null)
+		{
+			targetProcessStep = (ProcessStep)obj;
+			currentAct = actConfigs.FirstOrDefault(x => x.Code == targetProcessStep.Action);
+			tag = tags.FirstOrDefault(x => x.TagName == targetProcessStep.Target);
+
+			switch (tag.TagType)
+			{
+				case 0:
+					targetVal_bool = Convert.ToBoolean(targetProcessStep.Value);
+					targetVal_int = 0;
+					targetVal_float = 0.0f;
+					targetVal_string = "";
+					break;
+				case 1:
+					targetVal_bool = false;
+					targetVal_int = Int32.Parse(targetProcessStep.Value);
+					targetVal_float = 0.0f;
+					targetVal_string = "";
+					break;
+				case 2:
+					targetVal_bool = false;
+					targetVal_int = 0;
+					targetVal_float = Convert.ToSingle(targetProcessStep.Value);
+					targetVal_string = "";
+					break;
+				case 3:
+					targetVal_bool = false;
+					targetVal_int = 0;
+					targetVal_float = 0.0f;
+					targetVal_string = targetProcessStep.Value;
+					break;
+				default:
+					break;
+			}
+
+		}
+		
+	}
+}
