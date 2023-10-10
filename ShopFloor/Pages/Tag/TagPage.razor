@@ -34,7 +34,7 @@
 					<Columns>
 						<DxGridDataColumn FieldName="TagName" Caption="Name" Width="auto" />
 						<DxGridDataColumn FieldName="tagType" />
-						<DxGridDataColumn FieldName="value" />
+						<DxGridDataColumn FieldName="valueStr" Caption="vlaue" />
 						<DxGridDataColumn FieldName="lastestUpdate" Caption="Update Time" DisplayFormat="yyyy/MM/dd tt hh:mm:ss" />
 					</Columns>
 				</DxGrid>
@@ -52,7 +52,7 @@
 				<DxComboBox Data="@tagTypeList" @bind-Value="newTagType" EditFormat="{0}. {1}" DisplayFormat="{0}. {1}">
 					<Columns>
 						<DxListEditorColumn FieldName="code"></DxListEditorColumn>
-						<DxListEditorColumn FieldName="type" ></DxListEditorColumn>
+						<DxListEditorColumn FieldName="type"></DxListEditorColumn>
 					</Columns>
 				</DxComboBox>
 			</DxFormLayoutItem>
@@ -91,14 +91,14 @@
 		</DxFormLayout>
 	</BodyContentTemplate>
 	<FooterContentTemplate>
-		<DxButton RenderStyle="ButtonRenderStyle.Danger" Click="(async ()=>{await DeleteTag();})" Text="Delete"/>
+		<DxButton RenderStyle="ButtonRenderStyle.Danger" Click="(async ()=>{await DeleteTag();})" Text="Delete" />
 	</FooterContentTemplate>
 </DxPopup>
 
 @code {
-	private List<TagClass> tagClasses;
+	private List<TagSuperClass> tagClasses;
 
-	private TagClass selectedTag;
+	private TagSuperClass selectedTag;
 
 	private bool addDialogueVisible = false;
 	private string newTagName;
@@ -118,7 +118,7 @@
 		InitVar();
 	}
 
-	private void GetAllTags(List<TagClass> tagClasses)
+	private void GetAllTags(List<TagSuperClass> tagClasses)
 	{
 		InvokeAsync(() =>
 		{
@@ -127,16 +127,14 @@
 		});
 	}
 
-	private void GetUpsertTag(TagClass tag)
+	private void GetUpsertTag(TagSuperClass tag)
 	{
 		InvokeAsync(() =>
 		{
 			if (tagClasses.Any(x => x.TagName == tag.TagName))
 			{
-				TagClass tmp = tagClasses.FirstOrDefault(x => x.TagName == tag.TagName);
-				tmp.tagType = tag.tagType;
-				tmp.value = tag.value;
-				tmp.lastestUpdate = tag.lastestUpdate;
+				TagSuperClass tmp = tagClasses.FirstOrDefault(x => x.TagName == tag.TagName);
+				tmp = tag;
 			}
 			else
 			{
@@ -147,7 +145,7 @@
 		});
 	}
 
-	private void GetDeleteTags(TagClass tag)
+	private void GetDeleteTags(TagSuperClass tag)
 	{
 		InvokeAsync(() =>
 		{
@@ -183,7 +181,7 @@
 	{
 		if (obj != null)
 		{
-			selectedTag = (TagClass)obj;
+			selectedTag = (TagSuperClass)obj;
 		}
 	}
 

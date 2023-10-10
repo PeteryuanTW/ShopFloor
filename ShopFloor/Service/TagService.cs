@@ -1,7 +1,9 @@
 ﻿using ShopFloor.EFModels;
 using ShopFloor.RunTimeClass;
 using System.Collections.Generic;
+using System.Formats.Asn1;
 using static DevExpress.Data.Helpers.SyncHelper.ZombieContextsDetector;
+//using TagClass = ShopFloor.RunTimeClass.TagClass;
 
 namespace ShopFloor.Service
 {
@@ -28,16 +30,38 @@ namespace ShopFloor.Service
 			update = flag;
 		}
 
-		private List<TagClass> _tags;
-		public Task<List<TagClass>> GetTagClasses()
+		private List<TagSuperClass> _tags;
+		public Task<List<TagSuperClass>> GetTagClasses()
 		{
 			return Task.FromResult(_tags);
 		}
 		public async Task InitTags()
 		{
-            _tags = (await GetTags()).Select(x => new TagClass(x)).ToList();
+			_tags = new();
+			List<Tag> tmp = await GetTags();
+			foreach (Tag tag in tmp)
+			{
+				_tags.Add(InitTagByType(tag));
+				Console.WriteLine(InitTagByType(tag) is TagBool);
+			}
 		}
-        public Task<List<Tag>> GetTags()
+		private TagSuperClass InitTagByType(Tag tag)
+		{
+			switch (tag.TagType)
+			{
+				case 0:
+					return new TagBool(tag);
+				case 1:
+					return new TagInt(tag);
+				case 2:
+					return new TagFloat(tag);
+				case 3:
+					return new TagString(tag);
+				default:
+					return new TagSuperClass(tag);
+			}
+		}
+		public Task<List<Tag>> GetTags()
         {
             using (var scope = scopeFactory.CreateScope())
             {
@@ -45,14 +69,14 @@ namespace ShopFloor.Service
                 return Task.FromResult(context.Tags.ToList());
             }
         }
-        public event Action<List<TagClass>>? AllTagslAct;
-		private void OnAllTagsChanged(List<TagClass> tags) => AllTagslAct?.Invoke(_tags);
+        public event Action<List<TagSuperClass>>? AllTagslAct;
+		private void OnAllTagsChanged(List<TagSuperClass> tags) => AllTagslAct?.Invoke(_tags);
 
-		public event Action<TagClass>? SingleTagUpsertlAct;
-		private void OnSingleTagUpsert(TagClass tag) => SingleTagUpsertlAct?.Invoke(tag);
+		public event Action<TagSuperClass>? SingleTagUpsertlAct;
+		private void OnSingleTagUpsert(TagSuperClass tag) => SingleTagUpsertlAct?.Invoke(tag);
 
-		public event Action<TagClass>? SingleTagDeletelAct;
-		private void OnSingleTagDelete(TagClass tag) => SingleTagDeletelAct?.Invoke(tag);
+		public event Action<TagSuperClass>? SingleTagDeletelAct;
+		private void OnSingleTagDelete(TagSuperClass tag) => SingleTagDeletelAct?.Invoke(tag);
 
 		public async Task UpsertTag(Tag newTag)
 		{
@@ -62,17 +86,16 @@ namespace ShopFloor.Service
 				{
 					var context = scope.ServiceProvider.GetRequiredService<ShopFloorDBContext>();
 					IEnumerable<string> tagNames = _tags.Select(x => x.TagName);
-					TagClass tmp = new TagClass(newTag);
+					//TagSuperClass tmp;
 					//update
 					if (tagNames.Contains(newTag.TagName))
 					{
 						//memory
-						TagClass target_memory = _tags.FirstOrDefault(x => x.TagName == newTag.TagName);
+						TagSuperClass target_memory = _tags.FirstOrDefault(x => x.TagName == newTag.TagName);
 						if (target_memory != null)
 						{
-							target_memory.tagType = tmp.tagType;
-							target_memory.value = tmp.value;
-							target_memory.lastestUpdate = tmp.lastestUpdate;
+							_tags.Remove(target_memory);
+							_tags.Add(InitTagByType(newTag));
 						}
 						//db
 						Tag target_db = context.Tags.FirstOrDefault(x => x.TagName == newTag.TagName);
@@ -91,15 +114,18 @@ namespace ShopFloor.Service
 						{
 							return;
 						}
+						OnSingleTagUpsert(target_memory);
 					}
 					//insert
 					else
 					{
+						TagSuperClass _tmp = InitTagByType(newTag);
 						await context.Tags.AddAsync(newTag);
-						_tags.Add(tmp);
+						_tags.Add(_tmp);
+						OnSingleTagUpsert(_tmp);
 					}
 					await context.SaveChangesAsync();
-					OnSingleTagUpsert(tmp);
+					
 				}
 			});
 		}
@@ -137,7 +163,7 @@ namespace ShopFloor.Service
 			if (res)
 			{
 				//await InitTags();
-				OnSingleTagDelete(new TagClass(newTag));
+				OnSingleTagDelete(new TagSuperClass(newTag));
 			}
 			return res;
 		}
